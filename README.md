@@ -44,13 +44,13 @@ All without relying on AD cmdlets.
 ## Project Structure
 
 * Password-Expiry-Notifier-PowerShell
-- Users
-- users.csv
-* Logs
-- PasswordExpiry.log
-*Scripts
--PasswordExpiryNotifier.ps1
-*README.md
+	* Users
+		* users.csv
+	* Logs
+		* PasswordExpiry.log
+	* Scripts
+		* PasswordExpiryNotifier.ps1
+	* README.md
 
 
 ---
