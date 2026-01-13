@@ -1,7 +1,22 @@
 # Password Expiry Notifier – PowerShell
 
-An enterprise-ready PowerShell automation that monitors Active Directory user password expiry and account status using the native `net user` command, sends staged email reminders, and maintains detailed audit logs.  
-This solution does **not require the ActiveDirectory module**, making it suitable for restricted or locked-down environments.
+An enterprise-ready PowerShell automation that monitors Active Directory user password expiry and account status using the native `net user` command, sends staged email reminders, and maintains detailed audit logs.
+
+This solution does **not require the ActiveDirectory PowerShell module**, making it suitable for restricted or locked-down environments.
+
+---
+
+## Why This Project Exists
+
+Many enterprise environments restrict the use of the ActiveDirectory module on servers or end-user machines.  
+This script provides a **lightweight, dependency-free solution** to:
+
+- Track password expiry
+- Notify users proactively
+- Detect disabled accounts
+- Maintain audit-ready logs
+
+All without relying on AD cmdlets.
 
 ---
 
@@ -9,15 +24,20 @@ This solution does **not require the ActiveDirectory module**, making it suitabl
 
 - Reads user accounts from a CSV file
 - Uses `net user` to fetch domain account details
-- Identifies password expiry date, remaining days, expired passwords, and disabled accounts
+- Detects:
+  - Password expiry date
+  - Days remaining until expiry
+  - Expired passwords
+  - Disabled accounts
 - Sends automated email notifications:
   - 2 days before password expiry
   - 1 day before password expiry
   - On the day of expiry
   - After password expiration
   - When an account is disabled
-- Maintains timestamped audit logs for auditing and troubleshooting
-- Designed for unattended execution using Windows Task Scheduler
+- Creates required folders and CSV automatically
+- Generates timestamped audit logs
+- Designed for unattended execution via Windows Task Scheduler
 
 ---
 
@@ -41,18 +61,27 @@ Password-Expiry-Notifier-PowerShell
 
 ## CSV File Format
 
+The script reads user details from a CSV file.  
+If the file does not exist, it is automatically created with headers.
+
 ```csv
-Username,Email
+username,email
 john.doe,john.doe@company.com
 jane.smith,jane.smith@company.com
 
+## Field Description
+* username – Domain username used by net user
+* email – Recipient email address
+```
 
 ## Configuration
 
 ### Update the following variables in the script before execution:
 
-$CsvPath    = "D:\Projects\PasswordExpiryNotifier\Users\users.csv"
-$LogPath    = "D:\Projects\PasswordExpiryNotifier\Logs\PasswordExpiry.log"
+$RootPath   = "D:\Projects\PasswordExpiryNotifier"
+$CsvPath    = "$RootPath\Users\users.csv"
+$LogPath    = "$RootPath\Logs\PasswordExpiry.log"
+
 $SmtpServer = "smtp.company.com"
 $From       = "it-support@company.com"
 
