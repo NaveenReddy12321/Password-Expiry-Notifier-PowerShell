@@ -1,70 +1,133 @@
-﻿# ================= INITIALIZATION =================
-$BasePath = "D:\Projects\PasswordExpiryNotifier"
+﻿# ==============================
+# CONFIGURATION
+# ==============================
+$CsvPath   = "C:\passwordexpiryremainder\Users\users.csv"
+$LogPath   = "C:\passwordexpiryremainder\Logs\PasswordExpiry.log"
 
-$Users   = Import-Csv "$BasePath\config\users.csv"
-$Config  = Get-Content "$BasePath\config\settings.json" | ConvertFrom-Json
-$Creds   = Import-Clixml "$BasePath\credentials\smtp_creds.xml"
-$LogFile = "$BasePath\logs\PasswordExpiry.log"
+$SmtpServer = "smtp.company.com"
+$From       = "it-support@company.com"
 
-$Today = (Get-Date).Date
-$TargetDate = $Today.AddDays($Config.DaysBeforeExpiry)
-
+# ==============================
+# LOG FUNCTION
+# ==============================
 function Write-Log {
     param ($Message)
     Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - $Message"
 }
+if(-not(Test-Path $LogPath)){
+    New-Item -ItemType file -Path $LogPath
+}
 
-# ================= PROCESS USERS =================
+# ==============================
+# MAIL FUNCTION
+# ==============================
+function Send-ReminderMail {
+    param ($To, $Subject, $Body)
+
+    Send-MailMessage `
+        -From $From `
+        -To $To `
+        -Subject $Subject `
+        -Body $Body `
+        -SmtpServer $SmtpServer
+
+    Write-Log "Mail sent to $To | Subject: $Subject"
+}
+
+# ==============================
+# START SCRIPT
+# ==============================
+Write-Log "==== Script Started ===="
+
+$Users = Import-Csv $CsvPath
+
 foreach ($User in $Users) {
 
-    $Output = net user /domain $User.Username 2>$null
-    if (-not $Output) {
+    Write-Log "Processing user: $($User.Username)"
+
+    $Output = net user $($User.Username) 2>&1
+
+    if ($Output -match "The user name could not be found") {
         Write-Log "User not found: $($User.Username)"
         continue
     }
 
-    $ExpiryLine = $Output | Where-Object { $_ -match "Password expires" }
+    # ------------------------------
+    # Extract Account Active Status
+    # ------------------------------
+    $AccountActive = ($Output | Select-String "Account active").ToString().Split(":")[1].Trim()
+
+    # ------------------------------
+    # Extract Password Expiry Date
+    # ------------------------------
+    $ExpiryLine = ($Output | Select-String "Password expires").ToString()
+
     if ($ExpiryLine -match "Never") {
-        Write-Log "Password never expires: $($User.Username)"
+        Write-Log "Password never expires for $($User.Username)"
         continue
     }
 
-    $ExpiryDate = [datetime]::Parse(
-        ($ExpiryLine -replace "Password expires\s+", "").Trim()
-    )
+    $ExpiryDate = [datetime]($ExpiryLine.Split(":")[1].Trim())
+    $DaysLeft   = ($ExpiryDate.Date - (Get-Date).Date).Days
 
-    # ---------- PASSWORD EXPIRED ----------
-    if ($ExpiryDate.Date -lt $Today) {
-        $Subject = "🚨 PASSWORD EXPIRED – IMMEDIATE ACTION REQUIRED"
-        $Body = "Hello $($User.DisplayName),`n`nYour password expired on $ExpiryDate.`nContact IT Support immediately."
+    # ------------------------------
+    # ACCOUNT DISABLED CHECK
+    # ------------------------------
+    if ($AccountActive -eq "No") {
+        Send-ReminderMail `
+            -To $User.Email `
+            -Subject "Account Disabled Notification" `
+            -Body "Your domain account is currently DISABLED. Please contact IT Support."
 
-        Send-MailMessage -To $User.Email `
-            -From $Config.SMTP.FromEmail `
-            -Subject $Subject `
-            -Body $Body `
-            -SmtpServer $Config.SMTP.Server `
-            -Port $Config.SMTP.Port `
-            -UseSsl `
-            -Credential $Creds
-
-        Write-Log "Expired alert sent to $($User.Username)"
+        Write-Log "Account disabled for $($User.Username)"
         continue
     }
 
-    # ---------- EXPIRING IN 2 DAYS ----------
-    if ($ExpiryDate.Date -eq $TargetDate) {
-        $Subject = "⚠ Password Expiry Reminder (2 Days Left)"
-        $Body = "Hello $($User.DisplayName),`n`nYour password will expire on $ExpiryDate.`nPlease change it."
+    # ------------------------------
+    # PASSWORD EXPIRY CHECKS
+    # ------------------------------
+    switch ($DaysLeft) {
 
-        Send-MailMessage -To $User.Email `
-            -From $Config.SMTP.FromEmail `
-            -Subject $Subject `
-            -Body $Body `
-            -SmtpServer $Config.SMTP.Server `
-            -Port $Config.SMTP.Port `
-            -UseSsl `
-            -Credential $Creds
+        2 {
+            Send-ReminderMail `
+                -To $User.Email `
+                -Subject "Password Expiry Reminder (2 Days Left)" `
+                -Body "Your domain password will expire in 2 days. Please reset it."
 
-        Write-Log "Reminder sent to $($User.Username)"
+            Write-Log "2-day reminder sent to $($User.Username)"
+        }
+
+        1 {
+            Send-ReminderMail `
+                -To $User.Email `
+                -Subject "Password Expiry Reminder (1 Day Left)" `
+                -Body "Your domain password will expire tomorrow. Please reset it immediately."
+
+            Write-Log "1-day reminder sent to $($User.Username)"
+        }
+
+        0 {
+            Send-ReminderMail `
+                -To $User.Email `
+                -Subject "Password Expiring Today" `
+                -Body "Your domain password expires today. Please reset it now."
+
+            Write-Log "Same-day reminder sent to $($User.Username)"
+        }
+
+        { $_ -lt 0 } {
+            Send-ReminderMail `
+                -To $User.Email `
+                -Subject "Password Expired" `
+                -Body "Your domain password has already expired. Please contact IT Support."
+
+            Write-Log "Expired password mail sent to $($User.Username)"
+        }
+
+        default {
+            Write-Log "No action required for $($User.Username). Days left: $DaysLeft"
+        }
     }
 }
+
+Write-Log "==== Script Completed ===="
