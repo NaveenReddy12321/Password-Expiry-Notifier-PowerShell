@@ -133,7 +133,7 @@ $From       = "it-support@company.com"
 * Centralized IT summary report
 * Secure credential vault integration
 
-#Author
+# Author
 
 Naveen Sathi
 PowerShell Automation Engineer
