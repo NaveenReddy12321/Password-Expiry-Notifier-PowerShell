@@ -43,7 +43,7 @@ All without relying on AD cmdlets.
 
 ## Project Structure
 
-*Password-Expiry-Notifier-PowerShell
+* Password-Expiry-Notifier-PowerShell
 - Users
 - users.csv
 * Logs
