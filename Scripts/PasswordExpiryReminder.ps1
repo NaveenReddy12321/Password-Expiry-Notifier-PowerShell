@@ -1,6 +1,7 @@
 ﻿# ==============================
 # CONFIGURATION
 # ==============================
+$Basepath = "C:\passwordexpiryremainder\Logs"
 $CsvPath   = "C:\passwordexpiryremainder\Users\users.csv"
 $LogPath   = "C:\passwordexpiryremainder\Logs\PasswordExpiry.log"
 
@@ -13,6 +14,9 @@ $From       = "it-support@company.com"
 function Write-Log {
     param ($Message)
     Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - $Message"
+}
+if(-not(Test-Path $Basepayj)){
+    New-Item -ItemType Directory -Path $Basepath
 }
 if(-not(Test-Path $LogPath)){
     New-Item -ItemType file -Path $LogPath
